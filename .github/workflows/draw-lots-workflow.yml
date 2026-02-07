@@ -1,0 +1,35 @@
+name: Draw Lots
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'
+  workflow_dispatch:
+
+jobs:
+  draw_lots:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+      - name: Install dependencies
+        run: |
+          uv cache clean
+          uv sync
+      - name: Install playwright
+        run: |
+          uv run playwright install --with-deps
+
+      - name: Run main script
+        env:
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          SIGNAL_API_PHONE: ${{ secrets.SIGNAL_API_PHONE }}
+          SIGNAL_API_KEY: ${{ secrets.SIGNAL_API_KEY }}
+        run: uv run main.py
