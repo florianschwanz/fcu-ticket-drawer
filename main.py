@@ -23,6 +23,7 @@ USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
 SIGNAL_API_PHONE = os.getenv("SIGNAL_API_PHONE")
 SIGNAL_API_KEY = os.getenv("SIGNAL_API_KEY")
+TICKET_TYPE = os.getenv("TICKET_TYPE")
 
 LOGIN_URL = "https://anmeldung.fc-union-berlin.de/auth/realms/union/protocol/openid-connect/auth?client_id=union-tickets&scope=openid+lms_id&redirect_uri=https%3a%2f%2ftickets.union-zeughaus.de%2funveu%2fSynwayLoginSso%2fLoginCallback%2fAnmeldung&response_type=code"
 LANDING_PAGE_URL = "https://tickets.union-zeughaus.de/unveu/data"
@@ -139,7 +140,7 @@ def build_image_url(team):
 def draw_lots(debug):
     """
     Draws lots for upcoming home games of 1.FC Union Berlin and sends a notification via Signal with the game details and the team logo.
-    :return:
+    :param debug: if true, runs the browser in non-headless mode for debugging purposes
     """
 
     with sync_playwright() as p:
@@ -182,15 +183,20 @@ def draw_lots(debug):
             page.goto(url_info)
 
             team = page.locator("h2").first.inner_text().split(" - ")[1].strip().title()
-            date = page.locator(".date.pr-3").inner_text()
-            time = page.locator(".time.pr-3").inner_text()
+            date = page.locator(".date.pr-3").inner_text().strip()
+            time = page.locator(".time.pr-3").inner_text().strip()
 
             #
             # Draw lot
             #
 
             page.get_by_text(" Los sichern ").click()
-            page.get_by_text(" Stehplatz ").click()
+
+            if TICKET_TYPE == "sitting":
+                page.get_by_text(" Sitzplatz ").click()
+            else:
+                page.get_by_text(" Stehplatz ").click()
+
             page.get_by_text(" Buchen ").click()
             page.get_by_alt_text("Einkaufswagen").click()
 
