@@ -9,7 +9,9 @@
 # ///
 
 import os
+import random
 import sys
+import time
 from time import sleep
 
 import click
@@ -135,6 +137,9 @@ def build_image_url(team):
         return logos["VfL Wolfsburg"]
 
 
+def human_sleep(min_seconds=1.0, max_seconds=3.0):
+    time.sleep(random.uniform(min_seconds, max_seconds))
+
 @click.command()
 @click.option("--debug", "-d", default=False, is_flag=True, help="Enable debug mode.")
 def draw_lots(debug):
@@ -172,8 +177,8 @@ def draw_lots(debug):
 
         try:
             page.goto(LOGIN_URL)
-            page.fill("input[name='username']", USERNAME)
-            page.fill("input[name='password']", PASSWORD)
+            page.type("input[name='username']", USERNAME, delay=100) and human_sleep(0.5, 1.5)
+            page.type("input[name='password']", PASSWORD, delay=100) and human_sleep(0.5, 1.5)
             page.click("button[type='submit']")
             page.wait_for_load_state("networkidle")
             print("Login submitted.")
