@@ -144,14 +144,27 @@ def draw_lots(debug):
     """
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not debug)
+        browser = p.chromium.launch(
+            headless=not debug,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+            ],
+        )
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             viewport={"width": 1920, "height": 1080},
-            locale="de-DE"
+            locale="de-DE",
         )
 
         page = context.new_page()
+
+        # Inject JavaScript to delete the 'webdriver' property
+        page.add_init_script("""
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                """)
 
         #
         # Login
