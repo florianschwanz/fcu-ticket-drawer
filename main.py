@@ -17,15 +17,21 @@ from time import sleep
 import click
 import requests
 from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, Page
 
 load_dotenv()
 
 USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
-SIGNAL_API_PHONE = os.getenv("SIGNAL_API_PHONE")
-SIGNAL_API_KEY = os.getenv("SIGNAL_API_KEY")
-TICKET_TYPE = os.getenv("TICKET_TYPE")
+SIGNAL_API_PHONE = os.getenv("SIGNAL_API_PHONE", None)
+SIGNAL_API_KEY = os.getenv("SIGNAL_API_KEY", None)
+DRAW_LOTTERY_TICKET_MEN = (
+    os.getenv("DRAW_LOTTERY_TICKET_MEN", "False").lower() == "true"
+)
+DRAW_LOTTERY_TICKET_WOMEN = (
+    os.getenv("DRAW_LOTTERY_TICKET_WOMEN", "False").lower() == "true"
+)
+DRAW_LOTTERY_TICKET_TYPE = os.getenv("DRAW_LOTTERY_TICKET_TYPE")
 
 LOGOS = {
     "1.FC Heidenheim 1846": "https://raw.githubusercontent.com/luukhopman/football-logos/refs/heads/master/logos/Germany%20-%20Bundesliga/1.FC%20Heidenheim%201846.png",
@@ -51,6 +57,12 @@ LOGOS = {
 LOGIN_URL = "https://anmeldung.fc-union-berlin.de/auth/realms/union/protocol/openid-connect/auth?client_id=union-tickets&scope=openid+lms_id&redirect_uri=https%3a%2f%2ftickets.union-zeughaus.de%2funveu%2fSynwayLoginSso%2fLoginCallback%2fAnmeldung&response_type=code"
 LANDING_PAGE_URL = "https://tickets.union-zeughaus.de/unveu/data"
 BASE_URL = "https://tickets.union-zeughaus.de/unveu/"
+HOME_GAMES_MEN_URL = (
+    f"{BASE_URL}/SynwayWarengruppen/data/shop/e25ac3cd-90f7-46bc-8a61-951f371a3a72"
+)
+HOME_GAMES_WOMEN_URL = (
+    f"{BASE_URL}/SynwayWarengruppen/data/shop/e1d93006-319c-4a8a-93f6-2d1bbffc10f2"
+)
 
 
 @click.command()
@@ -110,74 +122,100 @@ def draw_lottery_tickets(debug):
         # Select option in cookie banner
         page.get_by_text("Ablehnen").click()
 
-        page.goto(LANDING_PAGE_URL)
-
-        url_home_games = [
-            element
-            for element in page.get_by_text("Heimspiele").all()
-            if element.get_attribute("href") is not None
-        ][0].get_attribute("href")
-        page.goto(url_home_games)
-
-        for info_button in page.get_by_text("Infos").all():
-            url_info = BASE_URL + info_button.get_attribute("href")
-            page.goto(url_info)
-
-            team = page.locator("h2").first.inner_text().split("-")[1].strip().title()
-            date = page.locator(".date.pr-3").inner_text().strip()
-            time = page.locator(".time.pr-3").inner_text().strip()
-
-            #
-            # Draw lottery ticket
-            #
-
-            if page.get_by_text("Los sichern").count() == 0:
-                print(
-                    f"Drawing phase already over for the game against {team} on {date}. Skipping."
-                )
-                continue
-
-            if page.get_by_text("Los sichern").count() == 0:
-                print(
-                    f"Drawing phase already over for the game against {team} on {date}. Skipping."
-                )
-                continue
-
-            page.get_by_text("Los sichern").click()
-
-            if TICKET_TYPE == "sitting":
-                page.get_by_text("Sitzplatz").click()
-            else:
-                page.get_by_text("Stehplatz").click()
-
-            page.get_by_text("Buchen").click()
-            page.get_by_alt_text("Einkaufswagen").click()
-
-            if page.locator(".alert-danger").count() > 0:
-                print(
-                    f"Already drew a lottery ticket for the game against {team} on {date}. Skipping."
-                )
-                continue
-
-            page.get_by_role("button", name="Zur Kasse").click()
-
-            for checkbox in page.get_by_role("checkbox").all():
-                checkbox.check()
-
-            page.get_by_text("Kaufen").click()
-
-            #
-            # Send signal message
-            #
-
-            signal_api_url = build_signal_api_url(SIGNAL_API_PHONE, SIGNAL_API_KEY)
-            send_signal_message(
-                signal_api_url,
-                f"❤️🤍 Los gezogen für Spiel gegen {team} am {date} um {time}",
+        if DRAW_LOTTERY_TICKET_MEN:
+            page.goto(HOME_GAMES_MEN_URL)
+            draw_lottery_tickets_for_team(
+                page,
+                team_name="men's team",
+                signal_message_template="❤️🤍 Los gezogen für das Spiel der Profis Männer gegen {opponent_name} am {date} um {time}",
             )
-            send_signal_image(signal_api_url, build_image_url(team))
+
+        if DRAW_LOTTERY_TICKET_WOMEN:
+            page.goto(HOME_GAMES_WOMEN_URL)
+            draw_lottery_tickets_for_team(
+                page,
+                team_name="women's team",
+                signal_message_template="❤️🤍 Los gezogen für das Spiel der Profis Frauen gegen {opponent_name} am {date} um {time}",
+            )
 
         browser.close()
+
+
+def draw_lottery_tickets_for_team(page: Page, team_name, signal_message_template):
+    """
+    Draws lottery tickets for all available home games for the given team.
+    :param page: page
+    :param team_name: team name
+    :param signal_message_template: template for signal message
+    :return:
+    """
+
+    if page.get_by_text("Infos").count() == 0:
+        print(f"No upcoming home games found for {team_name}. Skipping.")
+        return
+
+    for info_button in page.get_by_text("Infos").all():
+        url_info = BASE_URL + info_button.get_attribute("href")
+        page.goto(url_info)
+
+        opponent_name = (
+            page.locator("h2").first.inner_text().split("-")[1].strip().title()
+        )
+        date = page.locator(".date.pr-3").inner_text().strip()
+        time = page.locator(".time.pr-3").inner_text().strip()
+
+        #
+        # Draw lottery ticket
+        #
+
+        if page.get_by_text("Los sichern").count() == 0:
+            print(
+                f"Drawing phase already over for the {team_name} against {opponent_name} on {date}. Skipping."
+            )
+            continue
+
+        if page.get_by_text("Los sichern").count() == 0:
+            print(
+                f"Drawing phase already over for the game against {opponent_name} on {date}. Skipping."
+            )
+            continue
+
+        page.get_by_text("Los sichern").click()
+
+        if DRAW_LOTTERY_TICKET_TYPE == "sitting":
+            page.get_by_text("Sitzplatz").click()
+        else:
+            page.get_by_text("Stehplatz").click()
+
+        page.get_by_text("Buchen").click()
+        page.get_by_alt_text("Einkaufswagen").click()
+
+        if page.locator(".alert-danger").count() > 0:
+            print(
+                f"Already drew a lottery ticket for the men's game against {opponent_name} on {date}. Skipping."
+            )
+            continue
+
+        page.get_by_role("button", name="Zur Kasse").click()
+
+        for checkbox in page.get_by_role("checkbox").all():
+            checkbox.check()
+
+        page.get_by_text("Kaufen").click()
+
+        #
+        # Send signal message
+        #
+
+        signal_api_url = build_signal_api_url(SIGNAL_API_PHONE, SIGNAL_API_KEY)
+        send_signal_message(
+            signal_api_url,
+            signal_message_template.format(
+                opponent_name=opponent_name, date=date, time=time
+            ),
+        )
+
+        send_signal_image(signal_api_url, build_image_url(opponent_name))
 
 
 def build_signal_api_url(phone, api_key):
