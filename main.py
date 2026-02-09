@@ -137,6 +137,12 @@ def draw_lottery_tickets(debug):
                 )
                 continue
 
+            if page.get_by_text("Los sichern").count() == 0:
+                print(
+                    f"Drawing phase already over for the game against {team} on {date}. Skipping."
+                )
+                continue
+
             page.get_by_text("Los sichern").click()
 
             if TICKET_TYPE == "sitting":
