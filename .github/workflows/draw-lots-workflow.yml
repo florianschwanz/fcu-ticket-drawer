@@ -1,4 +1,4 @@
-name: Draw Lots
+name: Draw Lottery Tickets
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  draw_lots:
+  draw_lottery_tickets:
     runs-on: ubuntu-latest
 
     steps:
