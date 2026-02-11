@@ -81,9 +81,13 @@ script_path = os.path.dirname(file_path)
 
 @click.command()
 @click.option("--debug", "-d", default=False, is_flag=True, help="Enable debug mode.")
-def draw_lottery_tickets(debug):
+@click.option("--lots", "-l", default=False, is_flag=True, help="Enable drawing lots.")
+@click.option(
+    "--tickets", "-t", default=False, is_flag=True, help="Enable buying tickets."
+)
+def main(debug, lots, tickets):
     """
-    Draws lottery tickets for upcoming home games of 1.FC Union Berlin and sends a notification via Signal with the game details and the team logo.
+    Draws lottery tickets / buys tickets for upcoming home games of 1.FC Union Berlin and sends a notification via Signal with the game details and the team logo.
     :param debug: if true, runs the browser in non-headless mode for debugging purposes
     """
 
@@ -139,41 +143,43 @@ def draw_lottery_tickets(debug):
         except:
             pass
 
-        if DRAW_LOTTERY_TICKET_MEN:
-            draw_lottery_tickets_for_team(
-                page,
-                url=HOME_GAMES_MEN_URL,
-                team_name="men's team",
-                signal_message_template="❤️🤍 Los gezogen für das Spiel der Profis Männer gegen {opponent_name} am {date} um {time}",
-                debug=debug,
-            )
+        if lots:
+            if DRAW_LOTTERY_TICKET_MEN:
+                draw_lottery_tickets_for_team(
+                    page,
+                    url=HOME_GAMES_MEN_URL,
+                    team_name="men's team",
+                    signal_message_template="❤️🤍 Los gezogen für das Spiel der Profis Männer gegen {opponent_name} am {date} um {time}",
+                    debug=debug,
+                )
 
-        if DRAW_LOTTERY_TICKET_WOMEN:
-            draw_lottery_tickets_for_team(
-                page,
-                url=HOME_GAMES_WOMEN_URL,
-                team_name="women's team",
-                signal_message_template="❤️🤍 Los gezogen für das Spiel der Profis Frauen gegen {opponent_name} am {date} um {time}",
-                debug=debug,
-            )
+            if DRAW_LOTTERY_TICKET_WOMEN:
+                draw_lottery_tickets_for_team(
+                    page,
+                    url=HOME_GAMES_WOMEN_URL,
+                    team_name="women's team",
+                    signal_message_template="❤️🤍 Los gezogen für das Spiel der Profis Frauen gegen {opponent_name} am {date} um {time}",
+                    debug=debug,
+                )
 
-        if BUY_TICKET_MEN:
-            buy_tickets_for_team(
-                page,
-                url=HOME_GAMES_MEN_URL,
-                team_name="men's team",
-                signal_message_template="❤️🤍 Ticket gekauft für das Spiel der Profis Männer gegen {opponent_name} am {date} um {time}",
-                debug=debug,
-            )
+        if tickets:
+            if BUY_TICKET_MEN:
+                buy_tickets_for_team(
+                    page,
+                    url=HOME_GAMES_MEN_URL,
+                    team_name="men's team",
+                    signal_message_template="❤️🤍 Ticket gekauft für das Spiel der Profis Männer gegen {opponent_name} am {date} um {time}",
+                    debug=debug,
+                )
 
-        if BUY_TICKET_WOMEN:
-            buy_tickets_for_team(
-                page,
-                url=HOME_GAMES_WOMEN_URL,
-                team_name="women's team",
-                signal_message_template="❤️🤍 Ticket gekauft für das Spiel der Profis Frauen gegen {opponent_name} am {date} um {time}",
-                debug=debug,
-            )
+            if BUY_TICKET_WOMEN:
+                buy_tickets_for_team(
+                    page,
+                    url=HOME_GAMES_WOMEN_URL,
+                    team_name="women's team",
+                    signal_message_template="❤️🤍 Ticket gekauft für das Spiel der Profis Frauen gegen {opponent_name} am {date} um {time}",
+                    debug=debug,
+                )
 
         browser.close()
 
@@ -579,4 +585,4 @@ def human_sleep(min_seconds=1.0, max_seconds=3.0):
 
 
 if __name__ == "__main__":
-    draw_lottery_tickets(sys.argv[1:])
+    main(sys.argv[1:])

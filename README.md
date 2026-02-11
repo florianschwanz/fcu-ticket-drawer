@@ -1,4 +1,5 @@
 [![Draw Lots](https://github.com/florianschwanz/fcu-ticket-drawer/actions/workflows/draw-lots-workflow.yml/badge.svg)](https://github.com/florianschwanz/fcu-ticket-drawer/actions/workflows/draw-lots-workflow.yml)
+[![Buy Tickets](https://github.com/florianschwanz/fcu-ticket-drawer/actions/workflows/buy-tickets-workflow.yml/badge.svg)](https://github.com/florianschwanz/fcu-ticket-drawer/actions/workflows/buy-tickets-workflow.yml)
 
 <br />
 <p align="center">
@@ -133,6 +134,21 @@ Run this command to start the main script.
 
 ```shell
 uv run main.py
+```
+
+```
+Usage: main.py [OPTIONS]
+
+  Draws lottery tickets / buys tickets for upcoming home games of 1.FC Union
+  Berlin and sends a notification via Signal with the game details and the
+  team logo. :param debug: if true, runs the browser in non-headless mode for
+  debugging purposes
+
+Options:
+  -d, --debug    Enable debug mode.
+  -l, --lots     Enable drawing lots.
+  -t, --tickets  Enable buying tickets.
+  --help         Show this message and exit.
 ```
 
 ## Via GitHub Actions

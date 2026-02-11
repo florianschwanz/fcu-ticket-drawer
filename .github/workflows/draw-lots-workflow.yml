@@ -25,6 +25,9 @@ jobs:
       - name: Install playwright
         run: |
           uv run playwright install --with-deps
+      - name: Install tesseract
+        run: |
+          apt-get install tesseract-ocr
 
       - name: Run main script
         env:
@@ -32,4 +35,7 @@ jobs:
           PASSWORD: ${{ secrets.PASSWORD }}
           SIGNAL_API_PHONE: ${{ secrets.SIGNAL_API_PHONE }}
           SIGNAL_API_KEY: ${{ secrets.SIGNAL_API_KEY }}
-        run: uv run main.py
+          DRAW_LOTTERY_TICKET_MEN: ${{ secrets.DRAW_LOTTERY_TICKET_MEN }}
+          DRAW_LOTTERY_TICKET_WOMEN: ${{ secrets.DRAW_LOTTERY_TICKET_WOMEN }}
+          DRAW_LOTTERY_TICKET_TYPE: ${{ secrets.DRAW_LOTTERY_TICKET_TYPE }}
+        run: uv run main.py --lots
