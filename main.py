@@ -12,9 +12,12 @@ import os
 import random
 import sys
 import time
+from glob import glob
 from time import sleep
 
 import click
+import cv2
+import numpy as np
 import requests
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright, Page
@@ -32,6 +35,14 @@ DRAW_LOTTERY_TICKET_WOMEN = (
     os.getenv("DRAW_LOTTERY_TICKET_WOMEN", "False").lower() == "true"
 )
 DRAW_LOTTERY_TICKET_TYPE = os.getenv("DRAW_LOTTERY_TICKET_TYPE")
+
+BUY_TICKET_MEN = os.getenv("BUY_TICKET_MEN", "False").lower() == "true"
+BUY_TICKET_WOMEN = os.getenv("BUY_TICKET_WOMEN", "False").lower() == "true"
+BUY_TICKET_FAVORITE_BLOCKS = [
+    block.strip() for block in os.getenv("BUY_TICKET_FAVORITE_BLOCKS", "").split(",")
+]
+BUY_TICKET_TYPE = os.getenv("BUY_TICKET_TYPE", "member")
+BUY_TICKET_VOUCHER_CODE = os.getenv("BUY_TICKET_VOUCHER_CODE", None)
 
 LOGOS = {
     "1.FC Heidenheim 1846": "https://raw.githubusercontent.com/luukhopman/football-logos/refs/heads/master/logos/Germany%20-%20Bundesliga/1.FC%20Heidenheim%201846.png",
@@ -63,6 +74,9 @@ HOME_GAMES_MEN_URL = (
 HOME_GAMES_WOMEN_URL = (
     f"{BASE_URL}/SynwayWarengruppen/data/shop/e1d93006-319c-4a8a-93f6-2d1bbffc10f2"
 )
+
+file_path = os.path.realpath(__file__)
+script_path = os.path.dirname(file_path)
 
 
 @click.command()
@@ -120,43 +134,78 @@ def draw_lottery_tickets(debug):
         #
 
         # Select option in cookie banner
-        page.get_by_text("Ablehnen").click()
+        try:
+            page.get_by_text("Ablehnen").click()
+        except:
+            pass
 
         if DRAW_LOTTERY_TICKET_MEN:
-            page.goto(HOME_GAMES_MEN_URL)
             draw_lottery_tickets_for_team(
                 page,
+                url=HOME_GAMES_MEN_URL,
                 team_name="men's team",
                 signal_message_template="❤️🤍 Los gezogen für das Spiel der Profis Männer gegen {opponent_name} am {date} um {time}",
+                debug=debug,
             )
 
         if DRAW_LOTTERY_TICKET_WOMEN:
-            page.goto(HOME_GAMES_WOMEN_URL)
             draw_lottery_tickets_for_team(
                 page,
+                url=HOME_GAMES_WOMEN_URL,
                 team_name="women's team",
                 signal_message_template="❤️🤍 Los gezogen für das Spiel der Profis Frauen gegen {opponent_name} am {date} um {time}",
+                debug=debug,
+            )
+
+        if BUY_TICKET_MEN:
+            buy_tickets_for_team(
+                page,
+                url=HOME_GAMES_MEN_URL,
+                team_name="men's team",
+                signal_message_template="❤️🤍 Ticket gekauft für das Spiel der Profis Männer gegen {opponent_name} am {date} um {time}",
+                debug=debug,
+            )
+
+        if BUY_TICKET_WOMEN:
+            buy_tickets_for_team(
+                page,
+                url=HOME_GAMES_WOMEN_URL,
+                team_name="women's team",
+                signal_message_template="❤️🤍 Ticket gekauft für das Spiel der Profis Frauen gegen {opponent_name} am {date} um {time}",
+                debug=debug,
             )
 
         browser.close()
 
 
-def draw_lottery_tickets_for_team(page: Page, team_name, signal_message_template):
+def draw_lottery_tickets_for_team(
+    page: Page, url, team_name, signal_message_template, debug
+):
     """
     Draws lottery tickets for all available home games for the given team.
     :param page: page
+    :param url: URL
     :param team_name: team name
     :param signal_message_template: template for signal message
     :return:
     """
 
+    debug and print(f"Go to {HOME_GAMES_WOMEN_URL}")
+    page.goto(url)
+
     if page.get_by_text("Infos").count() == 0:
-        print(f"No upcoming home games found for {team_name}. Skipping.")
+        print(f"No upcoming {team_name} games found to draw a lot for. Skipping.")
         return
 
-    for info_button in page.get_by_text("Infos").all():
-        url_info = BASE_URL + info_button.get_attribute("href")
-        page.goto(url_info)
+    for venue_button in page.get_by_text("Infos").all():
+        if venue_button.get_attribute(
+            "href"
+        ) is None or "venue" not in venue_button.get_attribute("href"):
+            continue
+
+        venue_url = BASE_URL + venue_button.get_attribute("href")
+        debug and print(f"Go to {venue_url}")
+        page.goto(venue_url)
 
         opponent_name = (
             page.locator("h2").first.inner_text().split("-")[1].strip().title()
@@ -170,13 +219,7 @@ def draw_lottery_tickets_for_team(page: Page, team_name, signal_message_template
 
         if page.get_by_text("Los sichern").count() == 0:
             print(
-                f"Drawing phase already over for the {team_name} against {opponent_name} on {date}. Skipping."
-            )
-            continue
-
-        if page.get_by_text("Los sichern").count() == 0:
-            print(
-                f"Drawing phase already over for the game against {opponent_name} on {date}. Skipping."
+                f"Drawing phase already over for the {team_name} game against {opponent_name} on {date}. Skipping."
             )
             continue
 
@@ -190,14 +233,16 @@ def draw_lottery_tickets_for_team(page: Page, team_name, signal_message_template
         page.get_by_text("Buchen").click()
         page.get_by_alt_text("Einkaufswagen").click()
 
+        # Check if a lottery ticket is already drawn for this game
         if page.locator(".alert-danger").count() > 0:
             print(
-                f"Already drew a lottery ticket for the men's game against {opponent_name} on {date}. Skipping."
+                f"Already drew a lottery ticket for the {team_name} game against {opponent_name} on {date}. Skipping."
             )
             continue
 
         page.get_by_role("button", name="Zur Kasse").click()
 
+        # Check all checkboxes
         for checkbox in page.get_by_role("checkbox").all():
             checkbox.check()
 
@@ -216,6 +261,233 @@ def draw_lottery_tickets_for_team(page: Page, team_name, signal_message_template
         )
 
         send_signal_image(signal_api_url, build_image_url(opponent_name))
+
+
+def buy_tickets_for_team(
+    page: Page, url, team_name, signal_message_template, debug=False
+):
+    """
+    Buys tickets for all available home games for the given team.
+    :param page: page
+    :param url: URL
+    :param team_name: team name
+    :param signal_message_template: template for signal message
+    :return:
+    """
+
+    debug and print(f"Go to {HOME_GAMES_WOMEN_URL}")
+    page.goto(url)
+
+    if page.get_by_text("Tickets").count() == 0:
+        print(f"No upcoming {team_name} games found to buy a ticket for. Skipping.")
+        return
+
+    for venue_button in page.get_by_text("Tickets").all():
+        if venue_button.get_attribute(
+            "href"
+        ) is None or "venue" not in venue_button.get_attribute("href"):
+            continue
+
+        venue_url = BASE_URL + venue_button.get_attribute("href")
+        debug and print(f"Go to {venue_url}")
+        page.goto(venue_url)
+
+        opponent_name = page.locator("h2").first.inner_text().split("-")[1].strip()
+        date = page.locator(".date.pr-3").inner_text().strip()
+        time = page.locator(".time.pr-3").inner_text().strip()
+
+        #
+        # Select block and seat
+        #
+
+        # Wait for the canvas to load
+        sleep(5)
+
+        # Take screenshot of canvas
+        os.makedirs(os.path.join(script_path, "tmp"), exist_ok=True)
+        canvas = page.locator(".jsVenue")
+
+        # Identify positions of blocks on screenshot of canvas
+        blocks_map = get_clickable_items(
+            canvas,
+            os.path.join(script_path, "tmp", "canvas-stadium.png"),
+            os.path.join(script_path, "templates", "blocks"),
+        )
+
+        # Iterate over favorite blocks
+        for block in BUY_TICKET_FAVORITE_BLOCKS:
+            # Check if desired block is not identified
+            if block not in blocks_map or blocks_map[block][0] is None:
+                continue
+
+            # Click on block
+            coords = blocks_map[block][0]
+            canvas.click(position={"x": coords[0], "y": coords[1]})
+
+            # Select seat
+            if block in ["A1", "A2", "B1", "B2", "B3", "C1", "C2", "VIP"]:
+                # Wait for the canvas to update
+                sleep(5)
+
+                seats_map = get_clickable_items(
+                    page.locator(".jsVenue"),
+                    os.path.join(script_path, "tmp", "canvas-seats.png"),
+                    os.path.join(script_path, "templates", "seats"),
+                )
+
+                # Convert dict to list
+                seat_list = [seat for sublist in seats_map.values() for seat in sublist]
+                # Check if desired block is not identified
+                if not seat_list:
+                    print(f"No seat found in block {block}. Skipping.")
+                    return
+
+                for coords in seat_list:
+                    # Click on seat
+                    canvas.click(position={"x": coords[0], "y": coords[1]})
+
+                    # Check if ticket is in the shopping cart
+                    if (
+                        int(
+                            page.locator(
+                                "#jsShoppingCartButtonCount"
+                            ).first.inner_text()
+                        )
+                        > 0
+                    ):
+                        break
+
+                    sleep(1)
+
+            # Check if ticket is in the shopping cart
+            if int(page.locator("#jsShoppingCartButtonCount").first.inner_text()) > 0:
+                break
+
+        # Check if ticket for the desired block was added to the shopping cart
+        if int(page.locator("#jsShoppingCartButtonCount").first.inner_text()) == 0:
+            print(
+                f"Could not buy a ticket for the {team_name} against {opponent_name} on {date}."
+            )
+            break
+
+        page.get_by_role("button", name="Zur Kasse").click()
+
+        # Check if a ticket is already bought for this game
+        if page.locator(".alert-danger").count() > 0:
+            print(
+                f"Already bought a ticket for the {team_name} game against {opponent_name} on {date}. Skipping."
+            )
+            continue
+
+        # Select ticket type
+        page.get_by_role("button", name="Vollzahler").click()
+
+        if BUY_TICKET_TYPE == "full-payer":
+            page.get_by_role("button", name="Vollzahler").click()
+        if BUY_TICKET_TYPE == "member":
+            page.get_by_role("button", name="Mitglied", exact=True).click()
+        elif BUY_TICKET_TYPE == "child":
+            page.get_by_role("button", name="Kind [6 - 12 Jahre]").click()
+        elif BUY_TICKET_TYPE == "member-child":
+            page.get_by_role("button", name="Mitglied | Kind [6 bis 12 Jahre]").click()
+        else:
+            print(
+                f"Invalid ticket type specified: {BUY_TICKET_TYPE}. Please choose one of 'full-payer', 'member', 'child' or 'member-child'."
+            )
+            break
+
+        # Enter voucher code
+        page.type(
+            "input[name='KTRANS_GutscheinEinloesen']",
+            BUY_TICKET_VOUCHER_CODE,
+            delay=100 if not debug else 0,
+        ) and human_sleep(0.5, 1.5)
+        page.locator('input[value="Hinzufügen"]').click()
+
+        # Check if voucher code is invalid
+        if page.locator("#AlertDialogTitle").count() > 0:
+            print(f"Invalid voucher code. Skipping.")
+            return
+
+        # Check all checkboxes
+        for checkbox in page.get_by_role("checkbox").all():
+            checkbox.check()
+
+        page.get_by_text("Kaufen").click()
+
+        #
+        # Send signal message
+        #
+
+        signal_api_url = build_signal_api_url(SIGNAL_API_PHONE, SIGNAL_API_KEY)
+        send_signal_message(
+            signal_api_url,
+            signal_message_template.format(
+                opponent_name=opponent_name, date=date, time=time
+            ),
+        )
+
+        send_signal_image(signal_api_url, build_image_url(opponent_name))
+
+
+def get_clickable_items(canvas, screenshot_path, templates_dir):
+    # Take screenshot of canvas
+    os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
+    canvas.screenshot(path=screenshot_path)
+
+    # Load image
+    image = cv2.imread(screenshot_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    if image is None:
+        print("Error: Map image not found.")
+        return {}
+
+    found_items = {}
+
+    # Iterate through all template images
+    for template_path in glob(os.path.join(templates_dir, "*.png")):
+        # Get the label from filename
+        label, _ = os.path.splitext(os.path.basename(template_path))
+
+        # Load template in grayscale
+        template = cv2.imread(template_path)
+        template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+        w, h = template.shape[::-1]
+
+        # Perform Template Matching
+        res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
+
+        # Filter for High Confidence Matches
+        threshold = 0.8
+        loc = np.where(res >= threshold)
+
+        # We might find multiple pixels for the same letter (clusters).
+        # We need to group them into one single (x, y) point per item.
+        mask = np.zeros(image.shape, dtype="uint8")
+
+        for pt in zip(*loc[::-1]):
+            # Draw a white rectangle on a mask to "fuse" close detections
+            cv2.rectangle(mask, pt, (pt[0] + w, pt[1] + h), 255, -1)
+
+        # Find contours on this mask to get distinct centers
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        for contour in contours:
+            x, y, w_c, h_c = cv2.boundingRect(contour)
+            center_x = x + w_c // 2
+            center_y = y + h_c // 2
+            coordinates = (center_x, center_y)
+
+            if label not in found_items:
+                found_items[label] = []
+            if label in found_items and coordinates not in found_items[label]:
+                found_items[label].append(coordinates)
+
+    for key, value in sorted(found_items.items()):
+        print(f"Found item {key} at {value}")
+
+    return found_items
 
 
 def build_signal_api_url(phone, api_key):
