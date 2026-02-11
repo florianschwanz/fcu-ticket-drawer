@@ -9,7 +9,7 @@
   <h1 align="center">FCU Ticket Drawer</h1>
 
   <p align="center">
-    A Python script that automates lottery ticket drawing for FCU home games
+    A Python script that automates lottery ticket drawing / ticket buying for FCU home games
   </p>
 </p>
 
@@ -17,10 +17,10 @@ This documentation draft is inspired by the [arc42 template](https://arc42.org/o
 
 # 1. Introduction and Goals
 
-The aim of this project is to automate the process of drawing lottery tickets for FCU home games. The script will log in
-to the [Union Zeughaus](https://tickets.union-zeughaus.de/unveu/) ticketing system, check for available tickets, and
-automatically draw tickets when they become available. The script will also send notifications via Signal when tickets
-are drawn successfully.
+The aim of this project is to automate the process of drawing lottery tickets / buying tickets for FCU home games. The
+script will log in to the [Union Zeughaus](https://tickets.union-zeughaus.de/unveu/) ticketing system, check for
+available tickets, and automatically draw lottery tickets / buy tickets when they become available. The script will also
+send notifications via Signal when tickets are drawn / bought successfully.
 
 [//]: # "# 2. Constraints"
 
@@ -64,7 +64,8 @@ known issues).
 ## Optional: CallMeBot for Signal messaging
 
 The ticket drawer can send notifications via Signal when tickets are drawn successfully.
-To enable this feature, you need to create an API key for [CallMeBot](https://www.callmebot.com/blog/free-api-signal-send-messages/) to send notifications via Signal.
+To enable this feature, you need to create an API key
+for [CallMeBot](https://www.callmebot.com/blog/free-api-signal-send-messages/) to send notifications via Signal.
 
 ## Local
 
@@ -75,11 +76,19 @@ Run the following command to create a `.env` file with the required environment 
 ```shell
 echo "USERNAME=
 PASSWORD=
+
 SIGNAL_API_PHONE=
 SIGNAL_API_KEY=
+
 DRAW_LOTTERY_TICKET_MEN=
 DRAW_LOTTERY_TICKET_WOMEN=
-DRAW_LOTTERY_TICKET_TYPE=" > .env
+DRAW_LOTTERY_TICKET_TYPE=
+
+BUY_TICKET_MEN=
+BUY_TICKET_WOMEN=
+BUY_TICKET_FAVORITE_BLOCKS=
+BUY_TICKET_TYPE=
+BUY_TICKET_VOUCHER_CODE" > .env
 ```
 
 Specify the required environment variables in the `.env` file.
@@ -93,6 +102,12 @@ Specify the required environment variables in the `.env` file.
 * `DRAW_LOTTERY_TICKET_MEN` True, if lottery tickets for the men's team shall be drawn
 * `DRAW_LOTTERY_TICKET_WOMEN` True, if lottery tickets for the women's team shall be drawn
 * `DRAW_LOTTERY_TICKET_TYPE` the type of ticket to draw, either `standing` or `sitting`
+* `BUY_TICKET_MEN` True, if tickets for men's team shall be drawn
+* `BUY_TICKET_WOMEN` True, if tickets for women's team shall be drawn
+* `BUY_TICKET_FAVORITE_BLOCKS` comma-separated list of favorite blocks to buy tickets for, e.g. `R, Q, A1`
+* `BUY_TICKET_TYPE` type of ticket to be bought, may be `full-payer`, `member`, `child` or `member child`
+* `BUY_TICKET_VOUCHER_CODE` voucher code to be used when buying tickets to be
+  obtained [here](https://tickets.union-zeughaus.de/unveu/venue/Veranstaltungen/998b90e9-25bb-4f81-bb0a-15afd1927adc)
 
 Install uv, see https://github.com/astral-sh/uv?tab=readme-ov-file#installation.
 
@@ -122,11 +137,13 @@ uv run main.py
 
 ## Via GitHub Actions
 
-The following steps describe how to run the ticket drawer as a scheduled [GitHub Action](https://github.com/features/actions) that runs automatically in fixed intervals.
+The following steps describe how to run the ticket drawer as a
+scheduled [GitHub Action](https://github.com/features/actions) that runs automatically in fixed intervals.
 
 First, [fork this repository](https://github.com/florianschwanz/fcu-ticket-drawer/fork).
 
-In the forked repository create the following repository secrets (Settings > Secrets and variables > Actions > New repository secret).:
+In the forked repository create the following repository secrets (Settings > Secrets and variables > Actions > New
+repository secret).:
 
 * `USERNAME` the username of your [Union Zeughaus](https://tickets.union-zeughaus.de/unveu/) account
 * `PASSWORD` the password of your [Union Zeughaus](https://tickets.union-zeughaus.de/unveu/) account
@@ -137,8 +154,15 @@ In the forked repository create the following repository secrets (Settings > Sec
 * `DRAW_LOTTERY_TICKET_MEN` True, if lottery tickets for the men's team shall be drawn
 * `DRAW_LOTTERY_TICKET_WOMEN` True, if lottery tickets for the women's team shall be drawn
 * `DRAW_LOTTERY_TICKET_TYPE` the type of ticket to draw, either `standing` or `sitting`
+* `BUY_TICKET_MEN` True, if tickets for men's team shall be drawn
+* `BUY_TICKET_WOMEN` True, if tickets for women's team shall be drawn
+* `BUY_TICKET_FAVORITE_BLOCKS` comma-separated list of favorite blocks to buy tickets for, e.g. `R, Q, A1`
+* `BUY_TICKET_TYPE` type of ticket to be bought, may be `full-payer`, `member`, `child` or `member child`
+* `BUY_TICKET_VOUCHER_CODE` voucher code to be used when buying tickets to be
+  obtained [here](https://tickets.union-zeughaus.de/unveu/venue/Veranstaltungen/998b90e9-25bb-4f81-bb0a-15afd1927adc)
 
-That's it. The ticket drawer will now run according to the schedule defined in `.github/workflows/draw-lots-workflow.yml` and send notifications via Signal when tickets are drawn successfully.
+That's it. The ticket drawer will now run according to the schedule defined in
+`.github/workflows/draw-lots-workflow.yml` and send notifications via Signal when tickets are drawn successfully.
 
 [//]: # "# 7. Deployment View"
 
