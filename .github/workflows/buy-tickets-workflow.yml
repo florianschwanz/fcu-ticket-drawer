@@ -27,8 +27,8 @@ jobs:
           uv run playwright install --with-deps
       - name: Install tesseract
         run: |
-          apt-get install tesseract-ocr
-
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
       - name: Run main script
         env:
           USERNAME: ${{ secrets.USERNAME }}
