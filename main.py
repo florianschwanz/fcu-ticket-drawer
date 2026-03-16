@@ -242,6 +242,7 @@ def draw_lottery_tickets_for_team(
             page.get_by_text("Stehplatz").click()
 
         page.get_by_text("Buchen").click()
+        sleep(5)
         page.get_by_alt_text("Einkaufswagen").click()
 
         # Check if a lottery ticket is already drawn for this game
