@@ -200,7 +200,7 @@ def draw_lottery_tickets_for_team(
     :return:
     """
 
-    debug and print(f"Go to {HOME_GAMES_WOMEN_URL}")
+    debug and print(f"Go to {url}")
     page.goto(url)
 
     if page.get_by_text("Infos").count() == 0:
@@ -208,12 +208,13 @@ def draw_lottery_tickets_for_team(
         return
 
     for venue_button in page.get_by_text("Infos").all():
-        if venue_button.get_attribute(
-            "href"
-        ) is None or "venue" not in venue_button.get_attribute("href"):
+        venue_url = venue_button.get_attribute("href")
+
+        if venue_url is None:
+            print(f"No upcoming {team_name} games found to draw a lot for. Skipping.")
             continue
 
-        venue_url = BASE_URL + venue_button.get_attribute("href")
+        venue_url = BASE_URL + venue_url
         debug and print(f"Go to {venue_url}")
         page.goto(venue_url)
 
